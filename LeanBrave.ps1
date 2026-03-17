@@ -64,16 +64,15 @@ $logoBox.Size = New-Object System.Drawing.Size(30, 30)
 $logoBox.Location = New-Object System.Drawing.Point(10, 5)
 $logoBox.SizeMode = "Zoom"
 
-try {
-    $logoUrl = "https://github.com/user-attachments/assets/4a5526fe-4082-45b0-b50d-00513f5a19c7"
-    $wc = New-Object System.Net.WebClient
-    $raw = $wc.DownloadData($logoUrl)
-    $ms = New-Object System.IO.MemoryStream(,$raw)
-    $bmp = [System.Drawing.Bitmap]::FromStream($ms)
-    $logoBox.Image = $bmp
-    $hIcon = $bmp.GetHicon()
-    $form.Icon = [System.Drawing.Icon]::FromHandle($hIcon)
-} catch {}
+$logoPath = Join-Path $PSScriptRoot "logo.png"
+if (Test-Path $logoPath) {
+    try {
+        $bmp = [System.Drawing.Bitmap]::FromFile($logoPath)
+        $logoBox.Image = $bmp
+        $hIcon = $bmp.GetHicon()
+        $form.Icon = [System.Drawing.Icon]::FromHandle($hIcon)
+    } catch {}
+}
 $tBar.Controls.Add($logoBox)
 
 $tLab = New-Object System.Windows.Forms.Label
