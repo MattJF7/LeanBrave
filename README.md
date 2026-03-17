@@ -111,4 +111,4 @@ Choose a configuration that matches your needs:
 ### Run the command below in PowerShell (Admin):
 
 ```ps1
-iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/LeanBrave.ps1" -OutFile "LeanBrave.ps1"; .\LeanBrave.ps1
+iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/LeanBrave.ps1" -OutFile "LeanBrave.ps1"; iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/logo.png" -OutFile "logo.png"; .\LeanBrave.ps1
