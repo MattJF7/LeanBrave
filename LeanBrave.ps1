@@ -64,13 +64,15 @@ $logoBox.Size = New-Object System.Drawing.Size(30, 30)
 $logoBox.Location = New-Object System.Drawing.Point(10, 5)
 $logoBox.SizeMode = "Zoom"
 
-$logoPath = Join-Path $PSScriptRoot "logo.png"
-if (Test-Path $logoPath) {
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (!$scriptDir) { $scriptDir = $PSScriptRoot }
+$logoFile = Join-Path $scriptDir "logo.png"
+
+if (Test-Path $logoFile) {
     try {
-        $bmp = [System.Drawing.Bitmap]::FromFile($logoPath)
+        $bmp = [System.Drawing.Bitmap]::FromFile($logoFile)
         $logoBox.Image = $bmp
-        $hIcon = $bmp.GetHicon()
-        $form.Icon = [System.Drawing.Icon]::FromHandle($hIcon)
+        $form.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
     } catch {}
 }
 $tBar.Controls.Add($logoBox)
@@ -215,7 +217,7 @@ $form.Controls.Add($dnsD)
 
 $iBtn = New-MBtn "Import" 40 620 $mBlue
 $eBtn = New-MBtn "Export" 185 620 $mPeac
-$sBtn = New-MBtn "Apply Settings" 350 620 $mGree
+$sBtn = New-MBtn "Apply Settings" 330 620 $mGree
 $rBtn = New-MBtn "Reset All" 560 620 $mRed
 $form.Controls.AddRange(@($eBtn, $iBtn, $sBtn, $rBtn))
 
