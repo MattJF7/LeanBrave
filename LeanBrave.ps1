@@ -22,7 +22,9 @@ $mPeac = [System.Drawing.ColorTranslator]::FromHtml("#fab387")
 
 function Set-DnsMode {
     param ([string] $dnsMode)
-    Set-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -Value $dnsMode -Type String -Force
+    if ($dnsMode) {
+        Set-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -Value $dnsMode -Type String -Force
+    }
 }
 
 function New-Sec {
@@ -65,7 +67,7 @@ $logoBox.Location = New-Object System.Drawing.Point(10, 5)
 $logoBox.SizeMode = "Zoom"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (!$scriptDir) { $scriptDir = $PSScriptRoot }
+if (-not $scriptDir) { $scriptDir = $PSScriptRoot }
 $logoFile = Join-Path $scriptDir "logo.png"
 
 if (Test-Path $logoFile) {
@@ -222,23 +224,30 @@ $rBtn = New-MBtn "Reset All" 560 620 $mRed
 $form.Controls.AddRange(@($eBtn, $iBtn, $sBtn, $rBtn))
 
 $sBtn.Add_Click({
-    foreach ($cb in $allFeatures) {
-        if ($cb.Checked) {
-            $f = $cb.Tag
-            try { Set-ItemProperty -Path $registryPath -Name $f.Key -Value $f.Value -Type $f.Type -Force } catch {}
+    try {
+        if (-not (Test-Path $registryPath)) { New-Item -Path $registryPath -Force | Out-Null }
+        foreach ($cb in $allFeatures) {
+            if ($cb.Checked) {
+                $f = $cb.Tag
+                Set-ItemProperty -Path $registryPath -Name $f.Key -Value $f.Value -Type $f.Type -Force
+            }
         }
+        if ($dnsD.SelectedItem) { Set-DnsMode -dnsMode $dnsD.SelectedItem }
+        [System.Windows.Forms.MessageBox]::Show("Applied! Restart Brave.", "LeanBrave", 0, 64)
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error applying settings: $($_.Exception.Message)", "Error", 0, 16)
     }
-    if ($dnsD.SelectedItem) { Set-DnsMode -dnsMode $dnsD.SelectedItem }
-    [System.Windows.Forms.MessageBox]::Show("Applied! Restart Brave.", "LeanBrave", 0, 64)
 })
 
 $rBtn.Add_Click({
     if ([System.Windows.Forms.MessageBox]::Show("Erase all settings?", "Warning", "YesNo") -eq "Yes") {
         try {
-            Remove-Item -Path $registryPath -Recurse -Force
+            if (Test-Path $registryPath) { Remove-Item -Path $registryPath -Recurse -Force }
             New-Item -Path $registryPath -Force | Out-Null
             [System.Windows.Forms.MessageBox]::Show("Reset complete.", "LeanBrave", 0, 64)
-        } catch {}
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Reset failed: $($_.Exception.Message)", "Error", 0, 16)
+        }
     }
 })
 
@@ -246,8 +255,10 @@ $eBtn.Add_Click({
     $sfd = New-Object System.Windows.Forms.SaveFileDialog
     $sfd.Filter = "JSON (*.json)|*.json"; $sfd.FileName = "LeanBrave.json"
     if ($sfd.ShowDialog() -eq "OK") {
-        $out = @{ Features = ($allFeatures |? {$_.Checked} |% {$_.Tag.Key}); DnsMode = $dnsD.SelectedItem }
-        $out | ConvertTo-Json | Out-File $sfd.FileName -Force
+        try {
+            $out = @{ Features = ($allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Tag.Key}); DnsMode = $dnsD.SelectedItem }
+            $out | ConvertTo-Json | Out-File $sfd.FileName -Force
+        } catch {}
     }
 })
 
@@ -256,9 +267,14 @@ $iBtn.Add_Click({
     $ofd.Filter = "JSON (*.json)|*.json"
     if ($ofd.ShowDialog() -eq "OK") {
         try {
-            $set = Get-Content $ofd.FileName -Raw | ConvertFrom-Json
-            $allFeatures |% { $_.Checked = ($set.Features -contains $_.Tag.Key) }
-            $dnsD.SelectedItem = $set.DnsMode
+            $raw = Get-Content $ofd.FileName -Raw
+            if ($raw) {
+                $set = $raw | ConvertFrom-Json
+                foreach ($cb in $allFeatures) {
+                    $cb.Checked = ($set.Features -contains $cb.Tag.Key)
+                }
+                if ($set.DnsMode) { $dnsD.SelectedItem = $set.DnsMode }
+            }
         } catch {}
     }
 })
