@@ -2,14 +2,14 @@
 
 # LeanBrave
 <img width="200" height="300" alt="Image" src="https://github.com/user-attachments/assets/efb87da3-ca24-413f-b30c-605268828f10" />
+</div>
 
 ---
 
 ## Brave Browser Debloater
 
-LeanBrave is a PowerShell script that declutters the Brave Browser. It allows you to quickly toggle features on or off, optimizing your settings for better privacy and a cleaner experience.
-
-</div>
+LeanBrave is a PowerShell script that declutters the Brave Browser. It allows you to quickly toggle features on or off, optimizing your settings 
+for better privacy and a cleaner experience.
 
 ### 📂 Configuration Presets
 
@@ -108,7 +108,35 @@ Choose a configuration that matches your needs:
 
 # How to Run
 
-### Run the command below in PowerShell (Admin):
+### Run the command below in PowerShell:
 
 ```ps1
 iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/LeanBrave.ps1" -OutFile "LeanBrave.ps1"; iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/logo.png" -OutFile "logo.png"; .\LeanBrave.ps1
+```
+
+---
+
+## Extras:
+
+</details>
+
+<details>
+<summary> Requirements </summary>
+
+- Windows 10/11
+- PowerShell
+- Administrator privileges
+</details>
+
+<details>
+<summary>Error "Running Scripts is Disabled on this System"</summary>
+
+### Run this command in PowerShell:
+
+```ps1
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+```
+</details>
+<div align="center">
+
+</div>
