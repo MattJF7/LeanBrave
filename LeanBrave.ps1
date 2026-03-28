@@ -14,7 +14,7 @@ if (-not (Test-Path -Path $registryPath)) { New-Item -Path $registryPath -Force 
 $mBase = [System.Drawing.ColorTranslator]::FromHtml("#1e1e2e")
 $mSurf = [System.Drawing.ColorTranslator]::FromHtml("#313244")
 $mText = [System.Drawing.ColorTranslator]::FromHtml("#cdd6f4")
-$mSub  = [System.Drawing.ColorTranslator]::FromHtml("#bac2de")
+$mSub  = [System.Drawing.ColorTranslator]::FromHtml("#D6DFFF")
 $mBlue = [System.Drawing.ColorTranslator]::FromHtml("#89b4fa")
 $mGree = [System.Drawing.ColorTranslator]::FromHtml("#a6e3a1")
 $mRed  = [System.Drawing.ColorTranslator]::FromHtml("#f38ba8")
