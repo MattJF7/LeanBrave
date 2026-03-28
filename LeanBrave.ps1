@@ -1,7 +1,7 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell -ArgumentList "-File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
+    Start-Process powershell -ArgumentList "-NoProfile -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
     exit
 }
 
@@ -9,7 +9,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $registryPath = "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave"
-if (-not (Test-Path -Path $registryPath)) { New-Item -Path $registryPath -Force }
+if (-not (Test-Path -Path $registryPath)) { New-Item -Path $registryPath -Force | Out-Null }
 
 $mBase = [System.Drawing.ColorTranslator]::FromHtml("#1e1e2e")
 $mSurf = [System.Drawing.ColorTranslator]::FromHtml("#313244")
@@ -23,7 +23,6 @@ $mPeac = [System.Drawing.ColorTranslator]::FromHtml("#fab387")
 function Set-DnsMode {
     param ([string] $dnsMode)
     if ($dnsMode) {
-        Write-Host "Setting DNS Over HTTPS Mode to: $dnsMode" -ForegroundColor Cyan
         Set-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -Value $dnsMode -Type String -Force
     }
 }
@@ -73,8 +72,9 @@ $logoFile = Join-Path $scriptDir "logo.png"
 
 if (Test-Path $logoFile) {
     try {
-        $bmp = [System.Drawing.Bitmap]::FromFile($logoFile)
-        $logoBox.Image = $bmp
+        $img = [System.Drawing.Image]::FromFile($logoFile)
+        $logoBox.Image = $img
+        $bmp = New-Object System.Drawing.Bitmap($img)
         $form.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
     } catch {}
 }
@@ -226,25 +226,20 @@ $form.Controls.AddRange(@($eBtn, $iBtn, $sBtn, $rBtn))
 
 $sBtn.Add_Click({
     try {
-        Write-Host "`n--- Applying Settings ---" -ForegroundColor Green
         if (-not (Test-Path $registryPath)) { New-Item -Path $registryPath -Force | Out-Null }
         foreach ($cb in $allFeatures) {
             $f = $cb.Tag
             if ($cb.Checked) {
-                Write-Host "[SET] $($f.Name)" -ForegroundColor Gray
                 Set-ItemProperty -Path $registryPath -Name $f.Key -Value $f.Value -Type $f.Type -Force
             } else {
                 if (Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue) {
-                    Write-Host "[REMOVING] $($f.Name)" -ForegroundColor Yellow
                     Remove-ItemProperty -Path $registryPath -Name $f.Key -Force
                 }
             }
         }
         if ($dnsD.SelectedItem) { Set-DnsMode -dnsMode $dnsD.SelectedItem }
-        Write-Host "Done!`n" -ForegroundColor Green
         [System.Windows.Forms.MessageBox]::Show("Applied! Restart Brave.", "LeanBrave", 0, 64)
     } catch {
-        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
         [System.Windows.Forms.MessageBox]::Show("Error applying settings: $($_.Exception.Message)", "Error", 0, 16)
     }
 })
@@ -252,13 +247,12 @@ $sBtn.Add_Click({
 $rBtn.Add_Click({
     if ([System.Windows.Forms.MessageBox]::Show("Erase all settings?", "Warning", "YesNo") -eq "Yes") {
         try {
-            Write-Host "`n--- Resetting ---" -ForegroundColor Red
             if (Test-Path $registryPath) { Remove-Item -Path $registryPath -Recurse -Force }
             New-Item -Path $registryPath -Force | Out-Null
-            Write-Host "Registry wiped.`n" -ForegroundColor Green
+            foreach ($cb in $allFeatures) { $cb.Checked = $false }
+            $dnsD.SelectedIndex = -1
             [System.Windows.Forms.MessageBox]::Show("Reset complete.", "LeanBrave", 0, 64)
         } catch {
-            Write-Host "Reset Error: $($_.Exception.Message)" -ForegroundColor Red
             [System.Windows.Forms.MessageBox]::Show("Reset failed: $($_.Exception.Message)", "Error", 0, 16)
         }
     }
@@ -269,9 +263,9 @@ $eBtn.Add_Click({
     $sfd.Filter = "JSON (*.json)|*.json"; $sfd.FileName = "LeanBrave.json"
     if ($sfd.ShowDialog() -eq "OK") {
         try {
-            $out = @{ Features = ($allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Tag.Key}); DnsMode = $dnsD.SelectedItem }
+            $checkedNames = $allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Text}
+            $out = @{ Features = $checkedNames; DnsMode = $dnsD.SelectedItem }
             $out | ConvertTo-Json | Out-File $sfd.FileName -Force
-            Write-Host "Exported to $($sfd.FileName)" -ForegroundColor Cyan
         } catch {}
     }
 })
@@ -285,13 +279,25 @@ $iBtn.Add_Click({
             if ($raw) {
                 $set = $raw | ConvertFrom-Json
                 foreach ($cb in $allFeatures) {
-                    $cb.Checked = ($set.Features -contains $cb.Tag.Key)
+                    $cb.Checked = ($set.Features -contains $cb.Text)
                 }
                 if ($set.DnsMode) { $dnsD.SelectedItem = $set.DnsMode }
-                Write-Host "Imported from $($ofd.FileName)" -ForegroundColor Cyan
             }
         } catch {}
     }
 })
 
+foreach ($cb in $allFeatures) {
+    $f = $cb.Tag
+    $regValue = Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue
+    if ($null -ne $regValue -and $regValue.$($f.Key).ToString() -eq $f.Value.ToString()) {
+        $cb.Checked = $true
+    }
+}
+
+$dnsVal = Get-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -ErrorAction SilentlyContinue
+if ($null -ne $dnsVal) { $dnsD.SelectedItem = $dnsVal.DnsOverHttpsMode }
+
 [void] $form.ShowDialog()
+
+if ($img) { $img.Dispose() }
