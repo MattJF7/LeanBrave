@@ -1,7 +1,9 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell -ArgumentList "-NoProfile -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
+    try {
+        Start-Process powershell -ArgumentList "-NoProfile -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs -ErrorAction Stop
+    } catch { }
     exit
 }
 
@@ -76,7 +78,9 @@ if (Test-Path $logoFile) {
         $logoBox.Image = $img
         $bmp = New-Object System.Drawing.Bitmap($img)
         $form.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
-    } catch {}
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Could not load logo: $($_.Exception.Message)", "Error", 0, 16)
+    }
 }
 $tBar.Controls.Add($logoBox)
 
@@ -110,7 +114,7 @@ $tBar.Add_MouseMove({
 })
 $tBar.Add_MouseUp({ $script:drag = $false })
 
-$allFeatures = @()
+$allFeatures = New-Object System.Collections.Generic.List[System.Object]
 
 $lPan = New-Object System.Windows.Forms.Panel
 $lPan.Location = New-Object System.Drawing.Point(20, 60)
@@ -131,7 +135,7 @@ foreach ($f in $f1) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
-    $lPan.Controls.Add($cb); $allFeatures += $cb; $y += 24
+    $lPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
 $y += 12
@@ -156,7 +160,7 @@ foreach ($f in $f2) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
-    $lPan.Controls.Add($cb); $allFeatures += $cb; $y += 24
+    $lPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
 $rPan = New-Object System.Windows.Forms.Panel
@@ -172,7 +176,7 @@ $f3 = @(
     @{ Name = "Disable Brave Wallet"; Key = "BraveWalletDisabled"; Value = 1; Type = "DWord" },
     @{ Name = "Disable Brave VPN"; Key = "BraveVPNDisabled"; Value = 1; Type = "DWord" },
     @{ Name = "Disable Brave AI Chat"; Key = "BraveAIChatEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Brave Shields"; Key = "BraveShieldsDisabledForUrls"; Value = '["https://*", "http://*"]'; Type = "String" },
+    @{ Name = "Disable Brave Shields"; Key = "BraveShieldsDisabledForUrls"; Value = @("https://*", "http://*"); Type = "List" },
     @{ Name = "Disable Tor"; Key = "TorDisabled"; Value = 1; Type = "DWord" },
     @{ Name = "Disable Sync"; Key = "SyncDisabled"; Value = 1; Type = "DWord" }
 )
@@ -181,7 +185,7 @@ foreach ($f in $f3) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
-    $rPan.Controls.Add($cb); $allFeatures += $cb; $y += 24
+    $rPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
 $y += 12
@@ -204,7 +208,7 @@ foreach ($f in $f4) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
-    $rPan.Controls.Add($cb); $allFeatures += $cb; $y += 24
+    $rPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
 $dnsL = New-Object System.Windows.Forms.Label
@@ -230,10 +234,25 @@ $sBtn.Add_Click({
         foreach ($cb in $allFeatures) {
             $f = $cb.Tag
             if ($cb.Checked) {
-                Set-ItemProperty -Path $registryPath -Name $f.Key -Value $f.Value -Type $f.Type -Force
+                if ($f.Type -eq "List") {
+                    $listPath = Join-Path $registryPath $f.Key
+                    if (-not (Test-Path $listPath)) { New-Item -Path $listPath -Force | Out-Null }
+                    $i = 1
+                    foreach ($val in $f.Value) {
+                        Set-ItemProperty -Path $listPath -Name $i.ToString() -Value $val -Type String -Force
+                        $i++
+                    }
+                } else {
+                    Set-ItemProperty -Path $registryPath -Name $f.Key -Value $f.Value -Type $f.Type -Force
+                }
             } else {
-                if (Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue) {
-                    Remove-ItemProperty -Path $registryPath -Name $f.Key -Force
+                if ($f.Type -eq "List") {
+                    $listPath = Join-Path $registryPath $f.Key
+                    if (Test-Path $listPath) { Remove-Item -Path $listPath -Recurse -Force }
+                } else {
+                    if (Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue) {
+                        Remove-ItemProperty -Path $registryPath -Name $f.Key -Force
+                    }
                 }
             }
         }
@@ -266,7 +285,9 @@ $eBtn.Add_Click({
             $checkedNames = $allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Text}
             $out = @{ Features = $checkedNames; DnsMode = $dnsD.SelectedItem }
             $out | ConvertTo-Json | Out-File $sfd.FileName -Force
-        } catch {}
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Export failed: $($_.Exception.Message)", "Error", 0, 16)
+        }
     }
 })
 
@@ -283,15 +304,22 @@ $iBtn.Add_Click({
                 }
                 if ($set.DnsMode) { $dnsD.SelectedItem = $set.DnsMode }
             }
-        } catch {}
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Import failed: $($_.Exception.Message)", "Error", 0, 16)
+        }
     }
 })
 
 foreach ($cb in $allFeatures) {
     $f = $cb.Tag
-    $regValue = Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue
-    if ($null -ne $regValue -and $regValue.$($f.Key).ToString() -eq $f.Value.ToString()) {
-        $cb.Checked = $true
+    if ($f.Type -eq "List") {
+        $listPath = Join-Path $registryPath $f.Key
+        if (Test-Path $listPath) { $cb.Checked = $true }
+    } else {
+        $regValue = Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue
+        if ($null -ne $regValue -and $regValue.$($f.Key).ToString() -eq $f.Value.ToString()) {
+            $cb.Checked = $true
+        }
     }
 }
 
@@ -301,3 +329,4 @@ if ($null -ne $dnsVal) { $dnsD.SelectedItem = $dnsVal.DnsOverHttpsMode }
 [void] $form.ShowDialog()
 
 if ($img) { $img.Dispose() }
+$form.Dispose()
