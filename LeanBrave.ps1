@@ -58,6 +58,10 @@ $form.StartPosition = "CenterScreen"
 $form.BackColor = $mBase
 $form.FormBorderStyle = "None"
 
+$toolTip = New-Object System.Windows.Forms.ToolTip
+$toolTip.InitialDelay = 500
+$toolTip.AutoPopDelay = 5000
+
 $tBar = New-Object System.Windows.Forms.Panel
 $tBar.Size = New-Object System.Drawing.Size(760, 40)
 $tBar.BackColor = $mSurf
@@ -78,9 +82,7 @@ if (Test-Path $logoFile) {
         $logoBox.Image = $img
         $bmp = New-Object System.Drawing.Bitmap($img)
         $form.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("Could not load logo: $($_.Exception.Message)", "Error", 0, 16)
-    }
+    } catch { }
 }
 $tBar.Controls.Add($logoBox)
 
@@ -100,6 +102,17 @@ $cBtn.Location = New-Object System.Drawing.Point(725, 6)
 $cBtn.Cursor = "Hand"
 $cBtn.Add_Click({ $form.Close() })
 $tBar.Controls.Add($cBtn)
+
+$infoBtn = New-Object System.Windows.Forms.Label
+$infoBtn.Text = "i"
+$infoBtn.ForeColor = $mBlue
+$infoBtn.Font = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Bold)
+$infoBtn.Location = New-Object System.Drawing.Point(695, 6)
+$infoBtn.Size = New-Object System.Drawing.Size(25, 25)
+$infoBtn.TextAlign = "MiddleCenter"
+$infoBtn.Cursor = "Hand"
+$infoBtn.Add_Click({ Start-Process "https://github.com/MattJF7/LeanBrave" })
+$tBar.Controls.Add($infoBtn)
 
 $tBar.Add_MouseDown({
     $script:drag = $true
@@ -125,16 +138,17 @@ $form.Controls.Add($lPan)
 
 $lPan.Controls.Add((New-Sec "Telemetry Reporting" 10))
 $f1 = @(
-    @{ Name = "Disable Metrics Reporting"; Key = "MetricsReportingEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Safe Browsing Reporting"; Key = "SafeBrowsingExtendedReportingEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable URL Data Collection"; Key = "UrlKeyedAnonymizedDataCollectionEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Feedback Surveys"; Key = "FeedbackSurveysEnabled"; Value = 0; Type = "DWord" }
+    @{ Name = "Disable Metrics Reporting"; Key = "MetricsReportingEnabled"; Value = 0; Type = "DWord"; Desc = "Stops sending usage stats and crash reports to Brave." },
+    @{ Name = "Disable Safe Browsing Reporting"; Key = "SafeBrowsingExtendedReportingEnabled"; Value = 0; Type = "DWord"; Desc = "Prevents sending data about sites to check for threats." },
+    @{ Name = "Disable URL Data Collection"; Key = "UrlKeyedAnonymizedDataCollectionEnabled"; Value = 0; Type = "DWord"; Desc = "Stops Brave from sending anonymized URLs you visit." },
+    @{ Name = "Disable Feedback Surveys"; Key = "FeedbackSurveysEnabled"; Value = 0; Type = "DWord"; Desc = "Stops pop-ups asking for feedback." }
 )
 $y = 32
 foreach ($f in $f1) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
+    $toolTip.SetToolTip($cb, $f.Desc)
     $lPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
@@ -142,24 +156,25 @@ $y += 12
 $lPan.Controls.Add((New-Sec "Privacy Security" $y))
 $y += 22
 $f2 = @(
-    @{ Name = "Disable Safe Browsing"; Key = "SafeBrowsingProtectionLevel"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Autofill (Addresses)"; Key = "AutofillAddressEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Autofill (Credit Cards)"; Key = "AutofillCreditCardEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Password Manager"; Key = "PasswordManagerEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Browser Sign-in"; Key = "BrowserSignin"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable WebRTC IP Leak"; Key = "WebRtcIPHandling"; Value = "disable_non_proxied_udp"; Type = "String" },
-    @{ Name = "Disable QUIC Protocol"; Key = "QuicAllowed"; Value = 0; Type = "DWord" },
-    @{ Name = "Block Third Party Cookies"; Key = "BlockThirdPartyCookies"; Value = 1; Type = "DWord" },
-    @{ Name = "Enable Do Not Track"; Key = "EnableDoNotTrack"; Value = 1; Type = "DWord" },
-    @{ Name = "Force Google SafeSearch"; Key = "ForceGoogleSafeSearch"; Value = 1; Type = "DWord" },
-    @{ Name = "Disable IPFS"; Key = "IPFSEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Incognito Mode"; Key = "IncognitoModeAvailability"; Value = 1; Type = "DWord" },
-    @{ Name = "Force Incognito Mode"; Key = "IncognitoModeAvailability"; Value = 2; Type = "DWord" }
+    @{ Name = "Disable Safe Browsing"; Key = "SafeBrowsingProtectionLevel"; Value = 0; Type = "DWord"; Desc = "Turns off Google's phishing and malware protection." },
+    @{ Name = "Disable Autofill (Addresses)"; Key = "AutofillAddressEnabled"; Value = 0; Type = "DWord"; Desc = "Prevents Brave from saving/filling address forms." },
+    @{ Name = "Disable Autofill (Credit Cards)"; Key = "AutofillCreditCardEnabled"; Value = 0; Type = "DWord"; Desc = "Prevents Brave from saving/filling payment info." },
+    @{ Name = "Disable Password Manager"; Key = "PasswordManagerEnabled"; Value = 0; Type = "DWord"; Desc = "Disables the built-in password saver." },
+    @{ Name = "Disable Browser Sign-in"; Key = "BrowserSignin"; Value = 0; Type = "DWord"; Desc = "Stops Brave from suggesting account login." },
+    @{ Name = "Disable WebRTC IP Leak"; Key = "WebRtcIPHandling"; Value = "disable_non_proxied_udp"; Type = "String"; Desc = "Prevents your real IP from leaking during WebRTC use." },
+    @{ Name = "Disable QUIC Protocol"; Key = "QuicAllowed"; Value = 0; Type = "DWord"; Desc = "Blocks the QUIC protocol." },
+    @{ Name = "Block Third Party Cookies"; Key = "BlockThirdPartyCookies"; Value = 1; Type = "DWord"; Desc = "Blocks cookies from domains you aren't visiting." },
+    @{ Name = "Enable Do Not Track"; Key = "EnableDoNotTrack"; Value = 1; Type = "DWord"; Desc = "Sends 'Do Not Track' requests with traffic." },
+    @{ Name = "Force Google SafeSearch"; Key = "ForceGoogleSafeSearch"; Value = 1; Type = "DWord"; Desc = "Ensures Google search filters explicit content." },
+    @{ Name = "Disable IPFS"; Key = "IPFSEnabled"; Value = 0; Type = "DWord"; Desc = "Disables InterPlanetary File System protocol." },
+    @{ Name = "Disable Incognito Mode"; Key = "IncognitoModeAvailability"; Value = 1; Type = "DWord"; Desc = "Removes private window functionality." },
+    @{ Name = "Force Incognito Mode"; Key = "IncognitoModeAvailability"; Value = 2; Type = "DWord"; Desc = "Makes the browser strictly private." }
 )
 foreach ($f in $f2) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
+    $toolTip.SetToolTip($cb, $f.Desc)
     $lPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
@@ -172,19 +187,20 @@ $form.Controls.Add($rPan)
 
 $rPan.Controls.Add((New-Sec "Brave Features" 10))
 $f3 = @(
-    @{ Name = "Disable Brave Rewards"; Key = "BraveRewardsDisabled"; Value = 1; Type = "DWord" },
-    @{ Name = "Disable Brave Wallet"; Key = "BraveWalletDisabled"; Value = 1; Type = "DWord" },
-    @{ Name = "Disable Brave VPN"; Key = "BraveVPNDisabled"; Value = 1; Type = "DWord" },
-    @{ Name = "Disable Brave AI Chat"; Key = "BraveAIChatEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Brave Shields"; Key = "BraveShieldsDisabledForUrls"; Value = @("https://*", "http://*"); Type = "List" },
-    @{ Name = "Disable Tor"; Key = "TorDisabled"; Value = 1; Type = "DWord" },
-    @{ Name = "Disable Sync"; Key = "SyncDisabled"; Value = 1; Type = "DWord" }
+    @{ Name = "Disable Brave Rewards"; Key = "BraveRewardsDisabled"; Value = 1; Type = "DWord"; Desc = "Disables the BAT token ads/system." },
+    @{ Name = "Disable Brave Wallet"; Key = "BraveWalletDisabled"; Value = 1; Type = "DWord"; Desc = "Removes the Crypto Wallet feature." },
+    @{ Name = "Disable Brave VPN"; Key = "BraveVPNDisabled"; Value = 1; Type = "DWord"; Desc = "Removes the Brave VPN button." },
+    @{ Name = "Disable Brave AI Chat"; Key = "BraveAIChatEnabled"; Value = 0; Type = "DWord"; Desc = "Disables Leo AI chat." },
+    @{ Name = "Disable Brave Shields"; Key = "BraveShieldsDisabledForUrls"; Value = @("https://*", "http://*"); Type = "List"; Desc = "Turns off Brave ad-blocking globally." },
+    @{ Name = "Disable Tor"; Key = "TorDisabled"; Value = 1; Type = "DWord"; Desc = "Disables private windows with Tor." },
+    @{ Name = "Disable Sync"; Key = "SyncDisabled"; Value = 1; Type = "DWord"; Desc = "Prevents cross-device data syncing." }
 )
 $y = 32
 foreach ($f in $f3) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
+    $toolTip.SetToolTip($cb, $f.Desc)
     $rPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
@@ -192,22 +208,23 @@ $y += 12
 $rPan.Controls.Add((New-Sec "Performance Bloat" $y))
 $y += 22
 $f4 = @(
-    @{ Name = "Disable Background Mode"; Key = "BackgroundModeEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Media Recommendations"; Key = "MediaRecommendationsEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Shopping List"; Key = "ShoppingListEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Always Open PDF Externally"; Key = "AlwaysOpenPdfExternally"; Value = 1; Type = "DWord" },
-    @{ Name = "Disable Translate"; Key = "TranslateEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Spellcheck"; Key = "SpellcheckEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Promotions"; Key = "PromotionsEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Search Suggestions"; Key = "SearchSuggestEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Printing"; Key = "PrintingEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Default Browser Prompt"; Key = "DefaultBrowserSettingEnabled"; Value = 0; Type = "DWord" },
-    @{ Name = "Disable Developer Tools"; Key = "DeveloperToolsDisabled"; Value = 1; Type = "DWord" }
+    @{ Name = "Disable Background Mode"; Key = "BackgroundModeEnabled"; Value = 0; Type = "DWord"; Desc = "Stops Brave from running when closed." },
+    @{ Name = "Disable Media Recommendations"; Key = "MediaRecommendationsEnabled"; Value = 0; Type = "DWord"; Desc = "Stops suggested media on New Tab." },
+    @{ Name = "Disable Shopping List"; Key = "ShoppingListEnabled"; Value = 0; Type = "DWord"; Desc = "Disables shopping/price tracking." },
+    @{ Name = "Always Open PDF Externally"; Key = "AlwaysOpenPdfExternally"; Value = 1; Type = "DWord"; Desc = "Forces PDF downloads." },
+    @{ Name = "Disable Translate"; Key = "TranslateEnabled"; Value = 0; Type = "DWord"; Desc = "Disables integrated Google Translate." },
+    @{ Name = "Disable Spellcheck"; Key = "SpellcheckEnabled"; Value = 0; Type = "DWord"; Desc = "Disables resource-intensive spellcheck." },
+    @{ Name = "Disable Promotions"; Key = "PromotionsEnabled"; Value = 0; Type = "DWord"; Desc = "Stops upsell notifications." },
+    @{ Name = "Disable Search Suggestions"; Key = "SearchSuggestEnabled"; Value = 0; Type = "DWord"; Desc = "Stops sending keystrokes for search results." },
+    @{ Name = "Disable Printing"; Key = "PrintingEnabled"; Value = 0; Type = "DWord"; Desc = "Removes printing capabilities." },
+    @{ Name = "Disable Default Browser Prompt"; Key = "DefaultBrowserSettingEnabled"; Value = 0; Type = "DWord"; Desc = "Stops default browser pop-ups." },
+    @{ Name = "Disable Developer Tools"; Key = "DeveloperToolsDisabled"; Value = 1; Type = "DWord"; Desc = "Locks F12/Inspect console." }
 )
 foreach ($f in $f4) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $f.Name; $cb.Tag = $f; $cb.Location = New-Object System.Drawing.Point(20, $y)
     $cb.Size = New-Object System.Drawing.Size(300, 22); $cb.FlatStyle = "Flat"; $cb.ForeColor = $mSub
+    $toolTip.SetToolTip($cb, $f.Desc)
     $rPan.Controls.Add($cb); $allFeatures.Add($cb); $y += 24
 }
 
@@ -259,7 +276,7 @@ $sBtn.Add_Click({
         if ($dnsD.SelectedItem) { Set-DnsMode -dnsMode $dnsD.SelectedItem }
         [System.Windows.Forms.MessageBox]::Show("Applied! Restart Brave.", "LeanBrave", 0, 64)
     } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error applying settings: $($_.Exception.Message)", "Error", 0, 16)
+        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
     }
 })
 
@@ -271,9 +288,7 @@ $rBtn.Add_Click({
             foreach ($cb in $allFeatures) { $cb.Checked = $false }
             $dnsD.SelectedIndex = -1
             [System.Windows.Forms.MessageBox]::Show("Reset complete.", "LeanBrave", 0, 64)
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Reset failed: $($_.Exception.Message)", "Error", 0, 16)
-        }
+        } catch { }
     }
 })
 
@@ -285,9 +300,7 @@ $eBtn.Add_Click({
             $checkedNames = $allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Text}
             $out = @{ Features = $checkedNames; DnsMode = $dnsD.SelectedItem }
             $out | ConvertTo-Json | Out-File $sfd.FileName -Force
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Export failed: $($_.Exception.Message)", "Error", 0, 16)
-        }
+        } catch { }
     }
 })
 
@@ -299,14 +312,10 @@ $iBtn.Add_Click({
             $raw = Get-Content $ofd.FileName -Raw
             if ($raw) {
                 $set = $raw | ConvertFrom-Json
-                foreach ($cb in $allFeatures) {
-                    $cb.Checked = ($set.Features -contains $cb.Text)
-                }
+                foreach ($cb in $allFeatures) { $cb.Checked = ($set.Features -contains $cb.Text) }
                 if ($set.DnsMode) { $dnsD.SelectedItem = $set.DnsMode }
             }
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Import failed: $($_.Exception.Message)", "Error", 0, 16)
-        }
+        } catch { }
     }
 })
 
@@ -317,9 +326,7 @@ foreach ($cb in $allFeatures) {
         if (Test-Path $listPath) { $cb.Checked = $true }
     } else {
         $regValue = Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue
-        if ($null -ne $regValue -and $regValue.$($f.Key).ToString() -eq $f.Value.ToString()) {
-            $cb.Checked = $true
-        }
+        if ($null -ne $regValue -and $regValue.$($f.Key).ToString() -eq $f.Value.ToString()) { $cb.Checked = $true }
     }
 }
 
@@ -327,6 +334,5 @@ $dnsVal = Get-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -ErrorAc
 if ($null -ne $dnsVal) { $dnsD.SelectedItem = $dnsVal.DnsOverHttpsMode }
 
 [void] $form.ShowDialog()
-
 if ($img) { $img.Dispose() }
 $form.Dispose()
