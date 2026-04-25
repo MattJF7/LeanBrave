@@ -23,9 +23,23 @@ $mRed  = [System.Drawing.ColorTranslator]::FromHtml("#f38ba8")
 $mPeac = [System.Drawing.ColorTranslator]::FromHtml("#fab387")
 
 function Set-DnsMode {
-    param ([string] $dnsMode)
+    param ([string] $dnsMode, [string] $dnsTemplates)
     if ($dnsMode) {
-        Set-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -Value $dnsMode -Type String -Force
+        $resolvedMode = $dnsMode
+        if ($dnsMode -eq "custom") {
+            if ([string]::IsNullOrWhiteSpace($dnsTemplates)) {
+                [System.Windows.Forms.MessageBox]::Show("Custom DoH requires a template URL.", "Warning", 0, 48)
+                return $false
+            }
+            $resolvedMode = "secure"
+            Set-ItemProperty -Path $registryPath -Name "DnsOverHttpsTemplates" -Value $dnsTemplates -Type String -Force
+        } else {
+            if (Get-ItemProperty -Path $registryPath -Name "DnsOverHttpsTemplates" -ErrorAction SilentlyContinue) {
+                Remove-ItemProperty -Path $registryPath -Name "DnsOverHttpsTemplates" -Force
+            }
+        }
+        Set-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -Value $resolvedMode -Type String -Force
+        return $true
     }
 }
 
@@ -53,7 +67,7 @@ function New-MBtn {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "LeanBrave"
-$form.Size = New-Object System.Drawing.Size(760, 680)
+$form.Size = New-Object System.Drawing.Size(760, 720)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = $mBase
 $form.FormBorderStyle = "None"
@@ -164,9 +178,7 @@ $f2 = @(
     @{ Name = "Disable WebRTC IP Leak"; Key = "WebRtcIPHandling"; Value = "disable_non_proxied_udp"; Type = "String"; Desc = "Prevents your real IP from leaking during WebRTC use." },
     @{ Name = "Disable QUIC Protocol"; Key = "QuicAllowed"; Value = 0; Type = "DWord"; Desc = "Blocks the QUIC protocol." },
     @{ Name = "Block Third Party Cookies"; Key = "BlockThirdPartyCookies"; Value = 1; Type = "DWord"; Desc = "Blocks cookies from domains you aren't visiting." },
-    @{ Name = "Enable Do Not Track"; Key = "EnableDoNotTrack"; Value = 1; Type = "DWord"; Desc = "Sends 'Do Not Track' requests with traffic." },
     @{ Name = "Force Google SafeSearch"; Key = "ForceGoogleSafeSearch"; Value = 1; Type = "DWord"; Desc = "Ensures Google search filters explicit content." },
-    @{ Name = "Disable IPFS"; Key = "IPFSEnabled"; Value = 0; Type = "DWord"; Desc = "Disables InterPlanetary File System protocol." },
     @{ Name = "Disable Incognito Mode"; Key = "IncognitoModeAvailability"; Value = 1; Type = "DWord"; Desc = "Removes private window functionality." },
     @{ Name = "Force Incognito Mode"; Key = "IncognitoModeAvailability"; Value = 2; Type = "DWord"; Desc = "Makes the browser strictly private." }
 )
@@ -229,25 +241,37 @@ foreach ($f in $f4) {
 }
 
 $dnsL = New-Object System.Windows.Forms.Label
-$dnsL.Text = "DNS OVER HTTPS:"
+$dnsL.Text = "DNS OVER HTTPS MODE:"
 $dnsL.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
-$dnsL.Location = New-Object System.Drawing.Point(380, 582); $dnsL.Size = New-Object System.Drawing.Size(100, 20); $dnsL.ForeColor = $mText
+$dnsL.Location = New-Object System.Drawing.Point(20, 582); $dnsL.Size = New-Object System.Drawing.Size(140, 20); $dnsL.ForeColor = $mText
 $form.Controls.Add($dnsL)
 
 $dnsD = New-Object System.Windows.Forms.ComboBox
-$dnsD.Location = New-Object System.Drawing.Point(485, 579); $dnsD.Size = New-Object System.Drawing.Size(120, 25)
-$dnsD.Items.AddRange(@("automatic", "off", "custom")); $dnsD.FlatStyle = "Flat"; $dnsD.BackColor = $mSurf; $dnsD.ForeColor = $mText
+$dnsD.Location = New-Object System.Drawing.Point(165, 579); $dnsD.Size = New-Object System.Drawing.Size(120, 25)
+$dnsD.Items.AddRange(@("off", "automatic", "secure", "custom")); $dnsD.FlatStyle = "Flat"; $dnsD.BackColor = $mSurf; $dnsD.ForeColor = $mText
 $form.Controls.Add($dnsD)
 
-$iBtn = New-MBtn "Import" 40 620 $mBlue
-$eBtn = New-MBtn "Export" 185 620 $mPeac
-$sBtn = New-MBtn "Apply Settings" 330 620 $mGree
-$rBtn = New-MBtn "Reset All" 560 620 $mRed
+$dnsTL = New-Object System.Windows.Forms.Label
+$dnsTL.Text = "CUSTOM TEMPLATE URL:"
+$dnsTL.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$dnsTL.Location = New-Object System.Drawing.Point(300, 582); $dnsTL.Size = New-Object System.Drawing.Size(140, 20); $dnsTL.ForeColor = $mText
+$form.Controls.Add($dnsTL)
+
+$dnsT = New-Object System.Windows.Forms.TextBox
+$dnsT.Location = New-Object System.Drawing.Point(445, 579); $dnsT.Size = New-Object System.Drawing.Size(280, 25)
+$dnsT.BackColor = $mSurf; $dnsT.ForeColor = $mText; $dnsT.Enabled = $false
+$form.Controls.Add($dnsT)
+
+$dnsD.Add_SelectedIndexChanged({ $dnsT.Enabled = ($dnsD.SelectedItem -eq "custom") })
+
+$iBtn = New-MBtn "Import" 40 640 $mBlue
+$eBtn = New-MBtn "Export" 185 640 $mPeac
+$sBtn = New-MBtn "Apply Settings" 330 640 $mGree
+$rBtn = New-MBtn "Reset All" 560 640 $mRed
 $form.Controls.AddRange(@($eBtn, $iBtn, $sBtn, $rBtn))
 
 $sBtn.Add_Click({
     try {
-        if (-not (Test-Path $registryPath)) { New-Item -Path $registryPath -Force | Out-Null }
         foreach ($cb in $allFeatures) {
             $f = $cb.Tag
             if ($cb.Checked) {
@@ -256,8 +280,7 @@ $sBtn.Add_Click({
                     if (-not (Test-Path $listPath)) { New-Item -Path $listPath -Force | Out-Null }
                     $i = 1
                     foreach ($val in $f.Value) {
-                        Set-ItemProperty -Path $listPath -Name $i.ToString() -Value $val -Type String -Force
-                        $i++
+                        Set-ItemProperty -Path $listPath -Name $i.ToString() -Value $val -Type String -Force; $i++
                     }
                 } else {
                     Set-ItemProperty -Path $registryPath -Name $f.Key -Value $f.Value -Type $f.Type -Force
@@ -273,7 +296,7 @@ $sBtn.Add_Click({
                 }
             }
         }
-        if ($dnsD.SelectedItem) { Set-DnsMode -dnsMode $dnsD.SelectedItem }
+        if ($dnsD.SelectedItem) { if (-not (Set-DnsMode -dnsMode $dnsD.SelectedItem -dnsTemplates $dnsT.Text)) { return } }
         [System.Windows.Forms.MessageBox]::Show("Applied! Restart Brave.", "LeanBrave", 0, 64)
     } catch {
         [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
@@ -286,7 +309,7 @@ $rBtn.Add_Click({
             if (Test-Path $registryPath) { Remove-Item -Path $registryPath -Recurse -Force }
             New-Item -Path $registryPath -Force | Out-Null
             foreach ($cb in $allFeatures) { $cb.Checked = $false }
-            $dnsD.SelectedIndex = -1
+            $dnsD.SelectedIndex = -1; $dnsT.Text = ""
             [System.Windows.Forms.MessageBox]::Show("Reset complete.", "LeanBrave", 0, 64)
         } catch { }
     }
@@ -297,8 +320,8 @@ $eBtn.Add_Click({
     $sfd.Filter = "JSON (*.json)|*.json"; $sfd.FileName = "LeanBrave.json"
     if ($sfd.ShowDialog() -eq "OK") {
         try {
-            $checkedNames = $allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Text}
-            $out = @{ Features = $checkedNames; DnsMode = $dnsD.SelectedItem }
+            $checkedKeys = $allFeatures | Where-Object {$_.Checked} | ForEach-Object {$_.Tag.Key}
+            $out = @{ Features = $checkedKeys; DnsMode = $dnsD.SelectedItem; DnsTemplates = $dnsT.Text }
             $out | ConvertTo-Json | Out-File $sfd.FileName -Force
         } catch { }
     }
@@ -309,29 +332,26 @@ $iBtn.Add_Click({
     $ofd.Filter = "JSON (*.json)|*.json"
     if ($ofd.ShowDialog() -eq "OK") {
         try {
-            $raw = Get-Content $ofd.FileName -Raw
-            if ($raw) {
-                $set = $raw | ConvertFrom-Json
-                foreach ($cb in $allFeatures) { $cb.Checked = ($set.Features -contains $cb.Text) }
-                if ($set.DnsMode) { $dnsD.SelectedItem = $set.DnsMode }
-            }
+            $set = Get-Content $ofd.FileName -Raw | ConvertFrom-Json
+            foreach ($cb in $allFeatures) { $cb.Checked = ($set.Features -contains $cb.Tag.Key) }
+            if ($set.DnsMode) { $dnsD.SelectedItem = $set.DnsMode }
+            if ($set.DnsTemplates) { $dnsT.Text = $set.DnsTemplates }
         } catch { }
     }
 })
 
 foreach ($cb in $allFeatures) {
     $f = $cb.Tag
-    if ($f.Type -eq "List") {
-        $listPath = Join-Path $registryPath $f.Key
-        if (Test-Path $listPath) { $cb.Checked = $true }
-    } else {
+    if ($f.Type -eq "List") { $cb.Checked = (Test-Path (Join-Path $registryPath $f.Key)) }
+    else {
         $regValue = Get-ItemProperty -Path $registryPath -Name $f.Key -ErrorAction SilentlyContinue
         if ($null -ne $regValue -and $regValue.$($f.Key).ToString() -eq $f.Value.ToString()) { $cb.Checked = $true }
     }
 }
 
-$dnsVal = Get-ItemProperty -Path $registryPath -Name "DnsOverHttpsMode" -ErrorAction SilentlyContinue
-if ($null -ne $dnsVal) { $dnsD.SelectedItem = $dnsVal.DnsOverHttpsMode }
+$dnsVal = Get-ItemProperty -Path $registryPath -ErrorAction SilentlyContinue
+if ($dnsVal.DnsOverHttpsTemplates) { $dnsD.SelectedItem = "custom"; $dnsT.Text = $dnsVal.DnsOverHttpsTemplates }
+elseif ($dnsVal.DnsOverHttpsMode) { $dnsD.SelectedItem = $dnsVal.DnsOverHttpsMode }
 
 [void] $form.ShowDialog()
 if ($img) { $img.Dispose() }
