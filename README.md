@@ -93,4 +93,4 @@ Choose a configuration that matches your needs:
 Open **PowerShell as Administrator** and paste the following command to download and run the latest version:
 
 ```powershell
-iwr "[https://raw.githubusercontent.com/MattJF7/LeanBrave/main/LeanBrave.ps1](https://raw.githubusercontent.com/MattJF7/LeanBrave/main/LeanBrave.ps1)" -OutFile "LeanBrave.ps1"; iwr "[https://raw.githubusercontent.com/MattJF7/LeanBrave/main/logo.png](https://raw.githubusercontent.com/MattJF7/LeanBrave/main/logo.png)" -OutFile "logo.png"; .\LeanBrave.ps1
+iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/LeanBrave.ps1" -OutFile "LeanBrave.ps1"; iwr "https://raw.githubusercontent.com/MattJF7/LeanBrave/main/logo.png" -OutFile "logo.png"; .\LeanBrave.ps1
